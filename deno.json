@@ -1,0 +1,11 @@
+{
+  "tasks": {
+    "dev": "deno run --watch --allow-run main.ts",
+    "start": "deno run --allow-run main.ts",
+    "build": "deno compile --allow-run --output dist/screenshot-table main.ts",
+    "build:app": "deno compile --allow-run --output dist/screenshot-table main.ts && cp dist/screenshot-table ./app/ScreenshotTable.app/script"
+  },
+  "imports": {
+    "@std/assert": "jsr:@std/assert@1"
+  }
+}

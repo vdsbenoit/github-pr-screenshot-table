@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Get the app bundle directory (go up 2 levels from MacOS folder)
+APP_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+
+# Path to the actual executable
+EXECUTABLE_PATH="$APP_DIR/script"
+
+# Check if the executable exists
+if [ ! -f "$EXECUTABLE_PATH" ]; then
+    osascript -e 'display dialog "Screenshot Table executable not found. Please make sure the script binary is in the same directory as the app bundle." with title "Error" buttons {"OK"} default button "OK"'
+    exit 1
+fi
+
+# Run the executable with app-mode flag and capture the result
+cd "$APP_DIR"
+./script --app-mode
+
+# Exit with the same code as the executable
+exit $?
