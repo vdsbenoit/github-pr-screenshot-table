@@ -3,6 +3,7 @@ interface ImageInfo {
   src: string;
   category: string;
   timing: 'before' | 'after' | 'standalone';
+  order: number; // For preserving custom ordering
 }
 
 /**
@@ -95,6 +96,57 @@ async function writeClipboard(content: string): Promise<void> {
 }
 
 /**
+ * Parses a filename with number prefix and extracts feature information
+ * Examples:
+ * - "1. Feature_1_before" -> { order: 1, featureNumber: "1", timing: "before" }
+ * - "2.Feature 25_before" -> { order: 2, featureNumber: "25", timing: "before" }
+ * - "3 Feature 32" -> { order: 3, featureNumber: "32", timing: "standalone" }
+ * - "4feature54_after" -> { order: 4, featureNumber: "54", timing: "after" }
+ */
+function parseFilename(filename: string): {
+  order: number;
+  featureNumber: string;
+  timing: 'before' | 'after' | 'standalone';
+  formattedAlt: string;
+} {
+  // Remove number prefix (e.g., "1.", "2.", "3 ", "4")
+  const prefixMatch = filename.match(/^(\d+)\.?\s*/);
+  const order = prefixMatch ? parseInt(prefixMatch[1]) : 0;
+  const withoutPrefix = filename.replace(/^\d+\.?\s*/, '');
+  
+  // Check for timing suffix
+  const parts = withoutPrefix.split('_');
+  let timing: 'before' | 'after' | 'standalone' = 'standalone';
+  let contentParts = parts;
+  
+  if (parts.length >= 2) {
+    const lastPart = parts[parts.length - 1].toLowerCase();
+    if (lastPart === 'before' || lastPart === 'after') {
+      timing = lastPart as 'before' | 'after';
+      contentParts = parts.slice(0, -1);
+    }
+  }
+  
+  // Extract feature number from the content
+  const content = contentParts.join('_');
+  // Look for "feature" followed by a number (with optional space or underscore)
+  const featureMatch = content.match(/[Ff]eature[\s_]*(\d+)/i) || 
+                      (content.match(/^[Ff]eature(\d+)$/i)) ||
+                      (order > 0 && content.match(/^(\d+)$/)); // Only treat standalone numbers as features if there was a prefix order
+  const featureNumber = featureMatch ? featureMatch[1] : '';
+  
+  // Format the alt text
+  const formattedAlt = featureNumber ? `Feature ${featureNumber}` : content.replace(/_/g, ' ').trim();
+  
+  return {
+    order,
+    featureNumber,
+    timing,
+    formattedAlt
+  };
+}
+
+/**
  * Parses HTML content and extracts image information
  */
 function parseImages(htmlContent: string): ImageInfo[] {
@@ -107,71 +159,54 @@ function parseImages(htmlContent: string): ImageInfo[] {
     
     // Extract alt attribute
     const altMatch = imgTag.match(/alt="([^"]+)"/i);
-    const alt = altMatch ? altMatch[1] : '';
+    const originalAlt = altMatch ? altMatch[1] : '';
     
     // Extract src attribute
     const srcMatch = imgTag.match(/src="([^"]+)"/i);
     const src = srcMatch ? srcMatch[1] : '';
     
-    if (alt && src) {
-      // Parse alt to extract category and timing
-      const parts = alt.split('_');
-      if (parts.length >= 2) {
-        const lastPart = parts[parts.length - 1].toLowerCase();
-        if (lastPart === 'before' || lastPart === 'after') {
-          const timing = lastPart as 'before' | 'after';
-          const category = parts.slice(0, -1).join('_');
-          
-          images.push({
-            alt,
-            src,
-            category,
-            timing
-          });
-        } else {
-          // This is a standalone image (doesn't end with before/after)
-          images.push({
-            alt,
-            src,
-            category: alt, // Use the entire alt text as category for standalone images
-            timing: 'standalone'
-          });
-        }
-      } else {
-        // Single word alt text - treat as standalone
-        images.push({
-          alt,
-          src,
-          category: alt,
-          timing: 'standalone'
-        });
-      }
+    if (originalAlt && src) {
+      // Parse the filename to extract structured information
+      const parsed = parseFilename(originalAlt);
+      
+      images.push({
+        alt: parsed.formattedAlt,
+        src,
+        category: parsed.formattedAlt,
+        timing: parsed.timing,
+        order: parsed.order
+      });
     }
   }
+  
+  // Sort by the original order from filename prefixes
+  images.sort((a, b) => a.order - b.order);
   
   return images;
 }
 
 /**
- * Groups images by category and creates table rows
+ * Groups images by category and creates table rows, preserving order
  */
 function groupImagesByCategory(images: ImageInfo[]): { 
   standaloneImages: ImageInfo[];
-  pairedGroups: Map<string, { before?: ImageInfo; after?: ImageInfo }>;
+  pairedGroups: Map<string, { before?: ImageInfo; after?: ImageInfo; order: number }>;
 } {
   const standaloneImages: ImageInfo[] = [];
-  const pairedGroups = new Map<string, { before?: ImageInfo; after?: ImageInfo }>();
+  const pairedGroups = new Map<string, { before?: ImageInfo; after?: ImageInfo; order: number }>();
   
   for (const image of images) {
     if (image.timing === 'standalone') {
       standaloneImages.push(image);
     } else {
       if (!pairedGroups.has(image.category)) {
-        pairedGroups.set(image.category, {});
+        pairedGroups.set(image.category, { order: image.order });
       }
       
       const group = pairedGroups.get(image.category)!;
       group[image.timing] = image;
+      // Use the earliest order number for the group
+      group.order = Math.min(group.order, image.order);
     }
   }
   
@@ -189,10 +224,16 @@ function formatCategoryTitle(category: string): string {
 }
 
 /**
- * Generates HTML table from grouped images
+ * Generates HTML table from grouped images, preserving order
  */
-function generateTable(standaloneImages: ImageInfo[], pairedGroups: Map<string, { before?: ImageInfo; after?: ImageInfo }>): string {
+function generateTable(standaloneImages: ImageInfo[], pairedGroups: Map<string, { before?: ImageInfo; after?: ImageInfo; order: number }>): string {
   let tableHtml = '<table>\n';
+  
+  // Convert paired groups to array and sort by order
+  const sortedPairedGroups = Array.from(pairedGroups.entries())
+    .sort(([, a], [, b]) => a.order - b.order);
+  
+  // Standalone images are already sorted by order
   
   // First, add standalone images (max 2 per row)
   if (standaloneImages.length > 0) {
@@ -230,8 +271,8 @@ function generateTable(standaloneImages: ImageInfo[], pairedGroups: Map<string, 
     }
   }
   
-  // Then, add paired groups (before/after)
-  for (const [category, group] of pairedGroups) {
+  // Then, add paired groups (before/after) in order
+  for (const [category, group] of sortedPairedGroups) {
     const categoryTitle = formatCategoryTitle(category);
     
     // Add main category header row with colspan
