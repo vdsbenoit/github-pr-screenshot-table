@@ -217,11 +217,11 @@ function generateTable(standaloneImages: ImageInfo[], pairedGroups: Map<string, 
       
       // Add image row
       tableHtml += '  <tr>\n';
-      tableHtml += `    <td><img src="${image1.src}" width="400"></td>\n`;
+      tableHtml += `    <td><img src="${image1.src}" alt="${image1.alt}" width="400"></td>\n`;
       
       if (i + 1 < standaloneImages.length) {
         const image2 = standaloneImages[i + 1];
-        tableHtml += `    <td><img src="${image2.src}" width="400"></td>\n`;
+        tableHtml += `    <td><img src="${image2.src}" alt="${image2.alt}" width="400"></td>\n`;
       } else {
         tableHtml += '    <td></td>\n';
       }
@@ -249,13 +249,13 @@ function generateTable(standaloneImages: ImageInfo[], pairedGroups: Map<string, 
     tableHtml += '  <tr>\n';
     
     if (group.before) {
-      tableHtml += `    <td><img src="${group.before.src}" width="400"></td>\n`;
+      tableHtml += `    <td><img src="${group.before.src}" alt="${group.before.alt}" width="400"></td>\n`;
     } else {
       tableHtml += '    <td></td>\n';
     }
     
     if (group.after) {
-      tableHtml += `    <td><img src="${group.after.src}" width="400"></td>\n`;
+      tableHtml += `    <td><img src="${group.after.src}" alt="${group.after.alt}" width="400"></td>\n`;
     } else {
       tableHtml += '    <td></td>\n';
     }
