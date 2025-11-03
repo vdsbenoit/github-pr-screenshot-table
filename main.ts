@@ -234,10 +234,15 @@ function generateTable(standaloneImages: ImageInfo[], pairedGroups: Map<string, 
   for (const [category, group] of pairedGroups) {
     const categoryTitle = formatCategoryTitle(category);
     
-    // Add header row
+    // Add main category header row with colspan
     tableHtml += '  <tr>\n';
-    tableHtml += `    <th>${categoryTitle} Before</th>\n`;
-    tableHtml += `    <th>${categoryTitle} After</th>\n`;
+    tableHtml += `    <th colspan="2">${categoryTitle}</th>\n`;
+    tableHtml += '  </tr>\n';
+    
+    // Add sub-header row for Before/After
+    tableHtml += '  <tr>\n';
+    tableHtml += '    <th>Before</th>\n';
+    tableHtml += '    <th>After</th>\n';
     tableHtml += '  </tr>\n';
     
     // Add image row
