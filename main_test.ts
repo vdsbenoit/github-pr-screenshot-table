@@ -1,9 +1,9 @@
 import { assertEquals } from "@std/assert";
 
 // Test helper functions (we'll extract these from main.ts for testing)
-function parseImages(htmlContent: string): Array<{alt: string, src: string, category: string, timing: 'before' | 'after'}> {
+function parseImages(htmlContent: string): Array<{alt: string, src: string, category: string, timing: 'before' | 'after' | 'standalone'}> {
   const imgRegex = /<img[^>]+>/gi;
-  const images: Array<{alt: string, src: string, category: string, timing: 'before' | 'after'}> = [];
+  const images: Array<{alt: string, src: string, category: string, timing: 'before' | 'after' | 'standalone'}> = [];
   
   let match;
   while ((match = imgRegex.exec(htmlContent)) !== null) {
@@ -18,17 +18,34 @@ function parseImages(htmlContent: string): Array<{alt: string, src: string, cate
     if (alt && src) {
       const parts = alt.split('_');
       if (parts.length >= 2) {
-        const timing = parts[parts.length - 1].toLowerCase() as 'before' | 'after';
-        const category = parts.slice(0, -1).join('_');
-        
-        if (timing === 'before' || timing === 'after') {
+        const lastPart = parts[parts.length - 1].toLowerCase();
+        if (lastPart === 'before' || lastPart === 'after') {
+          const timing = lastPart as 'before' | 'after';
+          const category = parts.slice(0, -1).join('_');
+          
           images.push({
             alt,
             src,
             category,
             timing
           });
+        } else {
+          // This is a standalone image (doesn't end with before/after)
+          images.push({
+            alt,
+            src,
+            category: alt, // Use the entire alt text as category for standalone images
+            timing: 'standalone'
+          });
         }
+      } else {
+        // Single word alt text - treat as standalone
+        images.push({
+          alt,
+          src,
+          category: alt,
+          timing: 'standalone'
+        });
       }
     }
   }
@@ -68,4 +85,32 @@ Deno.test("formatCategoryTitle should format titles correctly", () => {
   assertEquals(formatCategoryTitle("tab"), "Tab");
   assertEquals(formatCategoryTitle("sign"), "Sign");
   assertEquals(formatCategoryTitle("my_long_category"), "My Long Category");
+});
+
+Deno.test("parseImages should handle mixed standalone and paired images", () => {
+  const htmlInput = `
+    <img alt="standalone1" src="https://example.com/img1.jpg" />
+    <img alt="standalone2" src="https://example.com/img2.jpg" />
+    <img alt="category_before" src="https://example.com/img3.jpg" />
+    <img alt="category_after" src="https://example.com/img4.jpg" />
+    <img alt="single_word" src="https://example.com/img5.jpg" />
+  `;
+  
+  const images = parseImages(htmlInput);
+  
+  assertEquals(images.length, 5);
+  
+  // Check standalone images
+  assertEquals(images[0].category, "standalone1");
+  assertEquals(images[0].timing, "standalone");
+  assertEquals(images[1].category, "standalone2");
+  assertEquals(images[1].timing, "standalone");
+  assertEquals(images[4].category, "single_word");
+  assertEquals(images[4].timing, "standalone");
+  
+  // Check paired images
+  assertEquals(images[2].category, "category");
+  assertEquals(images[2].timing, "before");
+  assertEquals(images[3].category, "category");
+  assertEquals(images[3].timing, "after");
 });

@@ -2,7 +2,7 @@ interface ImageInfo {
   alt: string;
   src: string;
   category: string;
-  timing: 'before' | 'after';
+  timing: 'before' | 'after' | 'standalone';
 }
 
 /**
@@ -117,17 +117,34 @@ function parseImages(htmlContent: string): ImageInfo[] {
       // Parse alt to extract category and timing
       const parts = alt.split('_');
       if (parts.length >= 2) {
-        const timing = parts[parts.length - 1].toLowerCase() as 'before' | 'after';
-        const category = parts.slice(0, -1).join('_');
-        
-        if (timing === 'before' || timing === 'after') {
+        const lastPart = parts[parts.length - 1].toLowerCase();
+        if (lastPart === 'before' || lastPart === 'after') {
+          const timing = lastPart as 'before' | 'after';
+          const category = parts.slice(0, -1).join('_');
+          
           images.push({
             alt,
             src,
             category,
             timing
           });
+        } else {
+          // This is a standalone image (doesn't end with before/after)
+          images.push({
+            alt,
+            src,
+            category: alt, // Use the entire alt text as category for standalone images
+            timing: 'standalone'
+          });
         }
+      } else {
+        // Single word alt text - treat as standalone
+        images.push({
+          alt,
+          src,
+          category: alt,
+          timing: 'standalone'
+        });
       }
     }
   }
@@ -138,19 +155,27 @@ function parseImages(htmlContent: string): ImageInfo[] {
 /**
  * Groups images by category and creates table rows
  */
-function groupImagesByCategory(images: ImageInfo[]): Map<string, { before?: ImageInfo; after?: ImageInfo }> {
-  const groups = new Map<string, { before?: ImageInfo; after?: ImageInfo }>();
+function groupImagesByCategory(images: ImageInfo[]): { 
+  standaloneImages: ImageInfo[];
+  pairedGroups: Map<string, { before?: ImageInfo; after?: ImageInfo }>;
+} {
+  const standaloneImages: ImageInfo[] = [];
+  const pairedGroups = new Map<string, { before?: ImageInfo; after?: ImageInfo }>();
   
   for (const image of images) {
-    if (!groups.has(image.category)) {
-      groups.set(image.category, {});
+    if (image.timing === 'standalone') {
+      standaloneImages.push(image);
+    } else {
+      if (!pairedGroups.has(image.category)) {
+        pairedGroups.set(image.category, {});
+      }
+      
+      const group = pairedGroups.get(image.category)!;
+      group[image.timing] = image;
     }
-    
-    const group = groups.get(image.category)!;
-    group[image.timing] = image;
   }
   
-  return groups;
+  return { standaloneImages, pairedGroups };
 }
 
 /**
@@ -166,10 +191,47 @@ function formatCategoryTitle(category: string): string {
 /**
  * Generates HTML table from grouped images
  */
-function generateTable(groups: Map<string, { before?: ImageInfo; after?: ImageInfo }>): string {
+function generateTable(standaloneImages: ImageInfo[], pairedGroups: Map<string, { before?: ImageInfo; after?: ImageInfo }>): string {
   let tableHtml = '<table>\n';
   
-  for (const [category, group] of groups) {
+  // First, add standalone images (max 2 per row)
+  if (standaloneImages.length > 0) {
+    for (let i = 0; i < standaloneImages.length; i += 2) {
+      tableHtml += '  <tr>\n';
+      
+      // First image in the row
+      const image1 = standaloneImages[i];
+      const title1 = formatCategoryTitle(image1.category);
+      tableHtml += `    <th>${title1}</th>\n`;
+      
+      // Second image in the row (if exists)
+      if (i + 1 < standaloneImages.length) {
+        const image2 = standaloneImages[i + 1];
+        const title2 = formatCategoryTitle(image2.category);
+        tableHtml += `    <th>${title2}</th>\n`;
+      } else {
+        tableHtml += '    <th></th>\n';
+      }
+      
+      tableHtml += '  </tr>\n';
+      
+      // Add image row
+      tableHtml += '  <tr>\n';
+      tableHtml += `    <td><img src="${image1.src}" width="400"></td>\n`;
+      
+      if (i + 1 < standaloneImages.length) {
+        const image2 = standaloneImages[i + 1];
+        tableHtml += `    <td><img src="${image2.src}" width="400"></td>\n`;
+      } else {
+        tableHtml += '    <td></td>\n';
+      }
+      
+      tableHtml += '  </tr>\n';
+    }
+  }
+  
+  // Then, add paired groups (before/after)
+  for (const [category, group] of pairedGroups) {
     const categoryTitle = formatCategoryTitle(category);
     
     // Add header row
@@ -218,20 +280,21 @@ async function convertClipboard(): Promise<void> {
     const images = parseImages(clipboardContent);
     
     if (images.length === 0) {
-      await showDialog("No valid images found in clipboard content. Make sure your HTML contains img tags with alt attributes ending in '_before' or '_after'.", "No Images Found", 'error');
+      await showDialog("No valid images found in clipboard content. Make sure your HTML contains img tags with alt attributes.", "No Images Found", 'error');
       return;
     }
     
     await showProgress(`Found ${images.length} images, grouping by category...`);
-    const groups = groupImagesByCategory(images);
+    const { standaloneImages, pairedGroups } = groupImagesByCategory(images);
     
     await showProgress("Generating table...");
-    const tableHtml = generateTable(groups);
+    const tableHtml = generateTable(standaloneImages, pairedGroups);
     
     await showProgress("Writing result to clipboard...");
     await writeClipboard(tableHtml);
     
-    await showDialog(`Successfully converted clipboard content to table format!\nProcessed ${groups.size} categories with ${images.length} images.`, "Success");
+    const totalCategories = standaloneImages.length + pairedGroups.size;
+    await showDialog(`Successfully converted clipboard content to table format!\nProcessed ${totalCategories} categories with ${images.length} images.`, "Success");
     
     // If running from app, we can exit cleanly
     if (isRunningFromApp()) {
