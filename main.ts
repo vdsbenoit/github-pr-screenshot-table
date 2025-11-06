@@ -227,7 +227,7 @@ function formatCategoryTitle(category: string): string {
  * Generates HTML table from grouped images, preserving order
  */
 function generateTable(standaloneImages: ImageInfo[], pairedGroups: Map<string, { before?: ImageInfo; after?: ImageInfo; order: number }>): string {
-  let tableHtml = '<table>\n';
+  let tableHtml = '<details><summary>Click to expand...</summary>\n<table>\n';
   
   // Convert paired groups to array and sort by order
   const sortedPairedGroups = Array.from(pairedGroups.entries())
@@ -304,7 +304,7 @@ function generateTable(standaloneImages: ImageInfo[], pairedGroups: Map<string, 
     tableHtml += '  </tr>\n';
   }
   
-  tableHtml += '</table>';
+  tableHtml += '</table></details>';
   
   return tableHtml;
 }
