@@ -2,6 +2,8 @@
 
 A Deno project for generating and managing tables of screenshots. This project is designed to help you organize, display, and process screenshots efficiently, making it ideal for documentation, testing, or visual comparison tasks.
 
+> **Disclaimer:** This project is 100% vibe coded ✨
+
 ## Features
 - Organize screenshots in a tabular format
 - Easily add, update, and manage screenshots
