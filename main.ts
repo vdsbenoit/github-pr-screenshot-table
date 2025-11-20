@@ -96,16 +96,17 @@ async function writeClipboard(content: string): Promise<void> {
 }
 
 /**
- * Parses a filename with number prefix and extracts feature information
+ * Parses a filename with number prefix and extracts timing information
  * Examples:
- * - "1. Feature_1_before" -> { order: 1, featureNumber: "1", timing: "before" }
- * - "2.Feature 25_before" -> { order: 2, featureNumber: "25", timing: "before" }
- * - "3 Feature 32" -> { order: 3, featureNumber: "32", timing: "standalone" }
- * - "4feature54_after" -> { order: 4, featureNumber: "54", timing: "after" }
+ * - "1. Feature_1_before" -> { order: 1, name: "Feature 1", timing: "before" }
+ * - "2.Feature 25_before" -> { order: 2, name: "Feature 25", timing: "before" }
+ * - "3 Feature 32" -> { order: 3, name: "Feature 32", timing: "standalone" }
+ * - "4feature54_after" -> { order: 4, name: "feature54", timing: "after" }
+ * - "5 feature whatever before" -> { order: 5, name: "feature whatever", timing: "before" }
+ * - "5 feature whatever after" -> { order: 5, name: "feature whatever", timing: "after" }
  */
 function parseFilename(filename: string): {
   order: number;
-  featureNumber: string;
   timing: 'before' | 'after' | 'standalone';
   formattedAlt: string;
 } {
@@ -114,35 +115,30 @@ function parseFilename(filename: string): {
   const order = prefixMatch ? parseInt(prefixMatch[1]) : 0;
   const withoutPrefix = filename.replace(/^\d+\.?\s*/, '');
   
-  // Check for timing suffix
-  const parts = withoutPrefix.split('_');
+  // Convert underscores to spaces
+  const normalized = withoutPrefix.replace(/_/g, ' ');
+  
+  // Check for trailing "before" or "after" (case-insensitive)
+  const beforeMatch = normalized.match(/\s+before\s*$/i);
+  const afterMatch = normalized.match(/\s+after\s*$/i);
+  
   let timing: 'before' | 'after' | 'standalone' = 'standalone';
-  let contentParts = parts;
+  let content = normalized.trim();
   
-  if (parts.length >= 2) {
-    const lastPart = parts[parts.length - 1].toLowerCase();
-    if (lastPart === 'before' || lastPart === 'after') {
-      timing = lastPart as 'before' | 'after';
-      contentParts = parts.slice(0, -1);
-    }
+  if (beforeMatch) {
+    timing = 'before';
+    // Remove the trailing "before" from content
+    content = normalized.replace(/\s+before\s*$/i, '').trim();
+  } else if (afterMatch) {
+    timing = 'after';
+    // Remove the trailing "after" from content
+    content = normalized.replace(/\s+after\s*$/i, '').trim();
   }
-  
-  // Extract feature number from the content
-  const content = contentParts.join('_');
-  // Look for "feature" followed by a number (with optional space or underscore)
-  const featureMatch = content.match(/[Ff]eature[\s_]*(\d+)/i) || 
-                      (content.match(/^[Ff]eature(\d+)$/i)) ||
-                      (order > 0 && content.match(/^(\d+)$/)); // Only treat standalone numbers as features if there was a prefix order
-  const featureNumber = featureMatch ? featureMatch[1] : '';
-  
-  // Format the alt text
-  const formattedAlt = featureNumber ? `Feature ${featureNumber}` : content.replace(/_/g, ' ').trim();
   
   return {
     order,
-    featureNumber,
     timing,
-    formattedAlt
+    formattedAlt: content
   };
 }
 

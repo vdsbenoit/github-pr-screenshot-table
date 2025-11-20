@@ -3,7 +3,6 @@ import { assertEquals } from "@std/assert";
 // Test helper function for filename parsing
 function parseFilename(filename: string): {
   order: number;
-  featureNumber: string;
   timing: 'before' | 'after' | 'standalone';
   formattedAlt: string;
 } {
@@ -12,35 +11,30 @@ function parseFilename(filename: string): {
   const order = prefixMatch ? parseInt(prefixMatch[1]) : 0;
   const withoutPrefix = filename.replace(/^\d+\.?\s*/, '');
   
-  // Check for timing suffix
-  const parts = withoutPrefix.split('_');
+  // Convert underscores to spaces
+  const normalized = withoutPrefix.replace(/_/g, ' ');
+  
+  // Check for trailing "before" or "after" (case-insensitive)
+  const beforeMatch = normalized.match(/\s+before\s*$/i);
+  const afterMatch = normalized.match(/\s+after\s*$/i);
+  
   let timing: 'before' | 'after' | 'standalone' = 'standalone';
-  let contentParts = parts;
+  let content = normalized.trim();
   
-  if (parts.length >= 2) {
-    const lastPart = parts[parts.length - 1].toLowerCase();
-    if (lastPart === 'before' || lastPart === 'after') {
-      timing = lastPart as 'before' | 'after';
-      contentParts = parts.slice(0, -1);
-    }
+  if (beforeMatch) {
+    timing = 'before';
+    // Remove the trailing "before" from content
+    content = normalized.replace(/\s+before\s*$/i, '').trim();
+  } else if (afterMatch) {
+    timing = 'after';
+    // Remove the trailing "after" from content
+    content = normalized.replace(/\s+after\s*$/i, '').trim();
   }
-  
-  // Extract feature number from the content
-  const content = contentParts.join('_');
-  // Look for "feature" followed by a number (with optional space or underscore)
-  const featureMatch = content.match(/[Ff]eature[\s_]*(\d+)/i) || 
-                      (content.match(/^[Ff]eature(\d+)$/i)) ||
-                      (order > 0 && content.match(/^(\d+)$/)); // Only treat standalone numbers as features if there was a prefix order
-  const featureNumber = featureMatch ? featureMatch[1] : '';
-  
-  // Format the alt text
-  const formattedAlt = featureNumber ? `Feature ${featureNumber}` : content.replace(/_/g, ' ').trim();
   
   return {
     order,
-    featureNumber,
     timing,
-    formattedAlt
+    formattedAlt: content
   };
 }
 
@@ -49,30 +43,26 @@ Deno.test("parseFilename - handles various filename formats", () => {
   // Test case 1: "1. Feature_1_before"
   const result1 = parseFilename("1. Feature_1_before");
   assertEquals(result1.order, 1);
-  assertEquals(result1.featureNumber, "1");
   assertEquals(result1.timing, "before");
   assertEquals(result1.formattedAlt, "Feature 1");
   
   // Test case 2: "2.Feature 25_before"
   const result2 = parseFilename("2.Feature 25_before");
   assertEquals(result2.order, 2);
-  assertEquals(result2.featureNumber, "25");
   assertEquals(result2.timing, "before");
   assertEquals(result2.formattedAlt, "Feature 25");
   
   // Test case 3: "3 Feature 32"
   const result3 = parseFilename("3 Feature 32");
   assertEquals(result3.order, 3);
-  assertEquals(result3.featureNumber, "32");
   assertEquals(result3.timing, "standalone");
   assertEquals(result3.formattedAlt, "Feature 32");
   
   // Test case 4: "4feature54_after"
   const result4 = parseFilename("4feature54_after");
   assertEquals(result4.order, 4);
-  assertEquals(result4.featureNumber, "54");
   assertEquals(result4.timing, "after");
-  assertEquals(result4.formattedAlt, "Feature 54");
+  assertEquals(result4.formattedAlt, "feature54");
 });
 
 // Test helper functions (updated version)
@@ -142,7 +132,7 @@ Deno.test("parseImages should extract image information correctly with number pr
   assertEquals(images[2].timing, "standalone");
   
   assertEquals(images[3].order, 4);
-  assertEquals(images[3].alt, "Feature 54");
+  assertEquals(images[3].alt, "feature54");
   assertEquals(images[3].timing, "after");
 });
 
