@@ -1,9 +1,23 @@
 # Copilot Instructions
 
 ## Project Snapshot
-- This repo is a single-file Deno CLI (`main.ts`) that converts HTML clipboard contents of `<img>` tags into a grouped comparison table.
-- macOS packaging lives under `app/ScreenshotTable.app`; `deno compile` drops the binary in `app/ScreenshotTable.app/script` for a double-clickable app.
+- This repo is a single-file Deno CLI (`main.ts`) with dual functionality:
+  1. **PR Title Parsing**: Converts plain text into formatted PR titles with ticket identifiers and part suffixes
+  2. **Screenshot Tables**: Converts HTML clipboard contents of `<img>` tags into grouped comparison tables
+- macOS packaging lives under `app/PRParser.app`; `deno compile` drops the binary in `app/PRParser.app/script` for a double-clickable app.
 - There are no external services; functionality hinges on local shell utilities (`pbpaste`, `pbcopy`, `osascript`).
+
+## Clipboard Entry Point (`main.ts`)
+- `convertClipboard()` is the main entry point that routes to either PR title parsing or screenshot table generation based on clipboard content
+- If clipboard doesn't start with `<img`, it triggers PR title parsing flow
+- If clipboard starts with `<img`, it triggers screenshot table flow
+
+## PR Title Flow
+- `parsePRTitle()` extracts ticket ID (first two words), handles "no ticket"/"noticket" cases, finds last "part N" suffix, and formats feature name
+- Ticket ID: First two words converted to `[WORD1-WORD2]` uppercase, except "no ticket" → `[no-ticket]` lowercase
+- Part suffix: Last occurrence of "part N" (N = number) extracted as `[PART-N]`
+- Feature name: Remaining words with first letter capitalized
+- All whitespace is normalized and trimmed
 
 ## Clipboard ➜ Table Flow (`main.ts`)
 - `convertClipboard()` is the entry point: show notification → read clipboard HTML → parse images → group → generate table → write back to clipboard → surface results.
@@ -20,7 +34,7 @@
 ## Tasks & Workflows (`deno.json`)
 - `deno task start` → quick CLI run (no `--watch`).
 - `deno task dev` → watch mode with same permissions; useful while tweaking parsing/formatting.
-- `deno task build` → produce CLI binary in `dist/screenshot-table`.
+- `deno task build` → produce CLI binary in `dist/pr-parser`.
 - `deno task build:app` → compile then copy binary into the `.app` bundle. Run this before distributing the macOS app.
 
 ## Testing Expectations (`main_test.ts`)

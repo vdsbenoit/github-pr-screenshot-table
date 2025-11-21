@@ -1,10 +1,86 @@
-# Screenshot Table - Usage Guide
+# PR Parser - Usage Guide
 
 ## Overview
 
-Screenshot Table is a macOS utility that converts HTML clipboard content containing images into organized comparison tables. It's designed to streamline the process of creating before/after comparisons and grouped screenshot displays for documentation, pull requests, and presentations.
+PR Parser is a dual-purpose macOS utility that works with clipboard content:
 
-## How It Works
+1. **PR Title Formatting**: Converts plain text into standardized PR titles with ticket identifiers, part suffixes, and proper capitalization
+2. **Screenshot Tables**: Converts HTML clipboard content containing images into organized comparison tables
+
+The tool automatically detects which mode to use based on clipboard content (HTML starting with `<img>` triggers screenshot mode, otherwise PR title mode).
+
+---
+
+## Mode 1: PR Title Formatting
+
+### How It Works
+
+1. **Copy plain text** - Copy a PR title draft to your clipboard (e.g., "Mb 80 feature name")
+2. **Run the tool** - Execute the app or CLI command
+3. **Get formatted title** - The tool automatically:
+   - Extracts ticket identifier from first two words
+   - Handles "no ticket" or "noticket" cases
+   - Finds and formats part suffixes (last "part N" in text)
+   - Capitalizes first letter of feature name
+   - Writes formatted result back to clipboard
+4. **Paste anywhere** - Your clipboard contains the formatted title
+
+### Formatting Rules
+
+#### Ticket Identifier
+- **First two words** become the ticket ID in `[WORD1-WORD2]` format (uppercase)
+- Special case: "no ticket" or "noticket" becomes `[no-ticket]` (lowercase)
+- Examples:
+  - `Mb 80` → `[MB-80]`
+  - `Saas 1234` → `[SAAS-1234]`
+  - `no ticket` → `[no-ticket]`
+  - `Noticket` → `[no-ticket]`
+
+#### Part Suffix
+- **Last occurrence** of "part N" (where N is a number) becomes `[PART-N]`
+- Must be exactly the word "part" followed by a number
+- Placed between ticket ID and feature name
+- Examples:
+  - `feature name part 1` → `[PART-1]` extracted
+  - `part 1 of the feature part 2` → `[PART-2]` extracted (last one)
+  - `this is part of the feature` → no part suffix ("part" not followed by number)
+
+#### Feature Name
+- Everything except ticket ID and part suffix becomes the feature name
+- **First letter only** is capitalized
+- Multiple spaces normalized to single space
+- Leading/trailing whitespace trimmed
+
+### Examples
+
+```
+Input:  Mb 80 feature name
+Output: [MB-80] Feature name
+
+Input:  Saas 1234 feature name part 1
+Output: [SAAS-1234] [PART-1] Feature name
+
+Input:  no ticket feature name
+Output: [no-ticket] Feature name
+
+Input:  Noticket another feature
+Output: [no-ticket] Another feature
+
+Input:  MB 123
+Output: [MB-123]
+
+Input:  Mb 80 part 1 of the feature part 2
+Output: [MB-80] [PART-2] Part 1 of the feature
+
+Input:    Saas  1234   feature   name  
+Output: [SAAS-1234] Feature name
+```
+
+---
+
+## Mode 2: Screenshot Tables
+
+### How It Works
 
 ### Clipboard Workflow
 
@@ -20,7 +96,7 @@ Screenshot Table is a macOS utility that converts HTML clipboard content contain
 
 ### Operating Modes
 
-- **macOS App** (`ScreenshotTable.app`): Double-click to run with visual notifications and dialogs
+- **macOS App** (`PRParser.app`): Double-click to run with visual notifications and dialogs
 - **CLI Mode**: Run via `deno run` for terminal output and logging
 
 ## Filename Syntax
