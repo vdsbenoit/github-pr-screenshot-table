@@ -3,8 +3,8 @@
     "dev": "deno run --watch --allow-run main.ts",
     "start": "deno run --allow-run main.ts",
     "build:script": "deno compile --allow-run --output dist/screenshot-table main.ts",
-    "build:app": "deno task build:script && cp dist/screenshot-table ./app/ScreenshotTable.app/script",
-    "build:install": "deno task build:app && cp -R app/ScreenshotTable.app /Applications/ScreenshotTable.app"
+    "build:app": "deno task build:script && cp dist/screenshot-table ./app/PRParser.app/script",
+    "build:install": "deno task build:app && cp -R app/PRParser.app /Applications/PRParser.app"
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@1"
