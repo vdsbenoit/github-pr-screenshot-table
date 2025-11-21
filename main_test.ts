@@ -1,5 +1,136 @@
 import { assertEquals } from "@std/assert";
 
+// Test helper function for PR title parsing
+function parsePRTitle(title: string): string {
+  // Trim whitespace
+  const trimmed = title.trim();
+  
+  // Split into words
+  const words = trimmed.split(/\s+/);
+  
+  if (words.length === 0) {
+    return '';
+  }
+  
+  // Extract first two words as ticket identifier
+  const firstWord = words[0].toLowerCase();
+  const secondWord = words.length > 1 ? words[1].toLowerCase() : '';
+  
+  let ticketId = '';
+  let remainingWords: string[] = [];
+  
+  // Check for "no ticket" or "noticket" cases
+  if (firstWord === 'no' && secondWord === 'ticket') {
+    ticketId = '[no-ticket]';
+    remainingWords = words.slice(2);
+  } else if (firstWord === 'noticket') {
+    ticketId = '[no-ticket]';
+    remainingWords = words.slice(1);
+  } else if (words.length >= 2) {
+    // Normal ticket ID: first two words
+    ticketId = `[${words[0].toUpperCase()}-${words[1].toUpperCase()}]`;
+    remainingWords = words.slice(2);
+  } else {
+    // Only one word - treat as ticket without number
+    ticketId = `[${words[0].toUpperCase()}]`;
+    remainingWords = [];
+  }
+  
+  // If no remaining words, return just the ticket ID
+  if (remainingWords.length === 0) {
+    return ticketId;
+  }
+  
+  // Look for the last "part N" pattern in remaining words
+  let partSuffix = '';
+  let featureWords = [...remainingWords];
+  
+  // Search from the end for "part N" pattern
+  for (let i = featureWords.length - 2; i >= 0; i--) {
+    if (featureWords[i].toLowerCase() === 'part' && /^\d+$/.test(featureWords[i + 1])) {
+      partSuffix = `[PART-${featureWords[i + 1]}]`;
+      // Keep words before "part N" and words after "part N"
+      const beforePart = featureWords.slice(0, i);
+      const afterPart = featureWords.slice(i + 2);
+      featureWords = [...beforePart, ...afterPart];
+      break;
+    }
+  }
+  
+  // If no feature words left after removing part suffix, return ticket + part only
+  if (featureWords.length === 0 && partSuffix) {
+    return `${ticketId} ${partSuffix}`;
+  }
+  
+  // Join feature words and capitalize first letter
+  const featureName = featureWords.join(' ');
+  const capitalizedFeature = featureName.charAt(0).toUpperCase() + featureName.slice(1);
+  
+  // Construct final title
+  if (partSuffix) {
+    return `${ticketId} ${partSuffix} ${capitalizedFeature}`;
+  } else {
+    return `${ticketId} ${capitalizedFeature}`;
+  }
+}
+
+// Test parsePRTitle function
+Deno.test("parsePRTitle - basic ticket with feature name", () => {
+  const result = parsePRTitle("Mb 80 group by parking lot");
+  assertEquals(result, "[MB-80] Group by parking lot");
+});
+
+Deno.test("parsePRTitle - ticket with part suffix", () => {
+  const result = parsePRTitle("Saas 1234 feature name part 1");
+  assertEquals(result, "[SAAS-1234] [PART-1] Feature name");
+});
+
+Deno.test("parsePRTitle - no ticket case (two words)", () => {
+  const result = parsePRTitle("no ticket feature name");
+  assertEquals(result, "[no-ticket] Feature name");
+});
+
+Deno.test("parsePRTitle - noticket case (one word)", () => {
+  const result = parsePRTitle("Noticket feature name");
+  assertEquals(result, "[no-ticket] Feature name");
+});
+
+Deno.test("parsePRTitle - ticket only (no feature name)", () => {
+  const result = parsePRTitle("MB 123");
+  assertEquals(result, "[MB-123]");
+});
+
+Deno.test("parsePRTitle - multiple part occurrences (last one wins)", () => {
+  const result = parsePRTitle("Mb 80 part 1 of the feature part 2");
+  assertEquals(result, "[MB-80] [PART-2] Part 1 of the feature");
+});
+
+Deno.test("parsePRTitle - whitespace trimming", () => {
+  const result = parsePRTitle("  Saas  1234   feature   name  ");
+  assertEquals(result, "[SAAS-1234] Feature name");
+});
+
+Deno.test("parsePRTitle - case handling in ticket ID", () => {
+  const result = parsePRTitle("mb 80 feature name");
+  assertEquals(result, "[MB-80] Feature name");
+});
+
+Deno.test("parsePRTitle - part suffix at different positions", () => {
+  const result1 = parsePRTitle("Mb 80 update feature part 3");
+  assertEquals(result1, "[MB-80] [PART-3] Update feature");
+  
+  const result2 = parsePRTitle("Mb 80 part 2 refactor");
+  assertEquals(result2, "[MB-80] [PART-2] Refactor");
+  
+  const result3 = parsePRTitle("Mb 80 part 2");
+  assertEquals(result3, "[MB-80] [PART-2]");
+});
+
+Deno.test("parsePRTitle - no part suffix when not followed by number", () => {
+  const result = parsePRTitle("Mb 80 this is part of the feature");
+  assertEquals(result, "[MB-80] This is part of the feature");
+});
+
 // Test helper function for filename parsing
 function parseFilename(filename: string): {
   order: number;

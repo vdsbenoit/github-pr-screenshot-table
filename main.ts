@@ -17,7 +17,7 @@ function isRunningFromApp(): boolean {
 /**
  * Shows a macOS dialog using osascript
  */
-async function showDialog(message: string, title: string = "Screenshot Table", type: 'info' | 'error' = 'info'): Promise<void> {
+async function showDialog(message: string, title: string = "PR Parser", type: 'info' | 'error' = 'info'): Promise<void> {
   if (!isRunningFromApp()) {
     console.log(`${type === 'error' ? '❌' : '✅'} ${title}: ${message}`);
     return;
@@ -44,7 +44,7 @@ async function showProgress(message: string): Promise<void> {
     return;
   }
 
-  const script = `display notification "${message.replace(/"/g, '\\"')}" with title "Screenshot Table"`;
+  const script = `display notification "${message.replace(/"/g, '\\"')}" with title "PR Parser"`;
   
   const process = new Deno.Command("osascript", {
     args: ["-e", script],
@@ -140,6 +140,88 @@ function parseFilename(filename: string): {
     timing,
     formattedAlt: content
   };
+}
+
+/**
+ * Parses a PR title and formats it with ticket identifier and optional part suffix
+ * Examples:
+ * - "Mb 80 group by parking lot" -> "[MB-80] Group by parking lot"
+ * - "Saas 1234 feature name part 1" -> "[SAAS-1234] [PART-1] Feature name"
+ * - "no ticket feature name" -> "[no-ticket] Feature name"
+ * - "Noticket feature name" -> "[no-ticket] Feature name"
+ * - "MB 123" -> "[MB-123]"
+ */
+function parsePRTitle(title: string): string {
+  // Trim whitespace
+  const trimmed = title.trim();
+  
+  // Split into words
+  const words = trimmed.split(/\s+/);
+  
+  if (words.length === 0) {
+    return '';
+  }
+  
+  // Extract first two words as ticket identifier
+  const firstWord = words[0].toLowerCase();
+  const secondWord = words.length > 1 ? words[1].toLowerCase() : '';
+  
+  let ticketId = '';
+  let remainingWords: string[] = [];
+  
+  // Check for "no ticket" or "noticket" cases
+  if (firstWord === 'no' && secondWord === 'ticket') {
+    ticketId = '[no-ticket]';
+    remainingWords = words.slice(2);
+  } else if (firstWord === 'noticket') {
+    ticketId = '[no-ticket]';
+    remainingWords = words.slice(1);
+  } else if (words.length >= 2) {
+    // Normal ticket ID: first two words
+    ticketId = `[${words[0].toUpperCase()}-${words[1].toUpperCase()}]`;
+    remainingWords = words.slice(2);
+  } else {
+    // Only one word - treat as ticket without number
+    ticketId = `[${words[0].toUpperCase()}]`;
+    remainingWords = [];
+  }
+  
+  // If no remaining words, return just the ticket ID
+  if (remainingWords.length === 0) {
+    return ticketId;
+  }
+  
+  // Look for the last "part N" pattern in remaining words
+  let partSuffix = '';
+  let featureWords = [...remainingWords];
+  
+  // Search from the end for "part N" pattern
+  for (let i = featureWords.length - 2; i >= 0; i--) {
+    if (featureWords[i].toLowerCase() === 'part' && /^\d+$/.test(featureWords[i + 1])) {
+      partSuffix = `[PART-${featureWords[i + 1]}]`;
+      // Keep words before "part N" and words after "part N"
+      const beforePart = featureWords.slice(0, i);
+      const afterPart = featureWords.slice(i + 2);
+      featureWords = [...beforePart, ...afterPart];
+      break;
+    }
+  }
+  
+  // If no feature words left after removing part suffix, return ticket + part only
+  if (featureWords.length === 0 && partSuffix) {
+    return `${ticketId} ${partSuffix}`;
+  }
+  
+  // Join feature words and capitalize first letter
+  const featureName = featureWords.join(' ');
+  const capitalizedFeature = featureName.charAt(0).toUpperCase() + featureName.slice(1);
+  
+  // Construct final title
+  if (partSuffix) {
+    return `${ticketId} ${partSuffix} ${capitalizedFeature}`;
+  } else {
+    return `${ticketId} ${capitalizedFeature}`;
+  }
 }
 
 /**
@@ -314,10 +396,33 @@ async function convertClipboard(): Promise<void> {
     const clipboardContent = await readClipboard();
     
     if (!clipboardContent.trim()) {
-      await showDialog("Clipboard is empty. Please copy some HTML content with image tags first.", "No Content", 'error');
+      await showDialog("Clipboard is empty. Please copy some content first.", "No Content", 'error');
       return;
     }
     
+    // Check if clipboard contains image HTML or plain text (PR title)
+    if (!clipboardContent.trim().startsWith('<img')) {
+      // PR title mode
+      await showProgress("Parsing PR title...");
+      const formattedTitle = parsePRTitle(clipboardContent);
+      
+      if (!formattedTitle) {
+        await showDialog("Could not parse PR title. Please check the format.", "Parse Error", 'error');
+        return;
+      }
+      
+      await showProgress("Writing formatted title to clipboard...");
+      await writeClipboard(formattedTitle);
+      
+      await showDialog(`Successfully formatted PR title!\n\nResult: ${formattedTitle}`, "Success");
+      
+      if (isRunningFromApp()) {
+        Deno.exit(0);
+      }
+      return;
+    }
+    
+    // Image table mode
     await showProgress("Parsing images...");
     const images = parseImages(clipboardContent);
     
