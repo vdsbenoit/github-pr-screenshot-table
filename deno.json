@@ -4,7 +4,7 @@
     "start": "deno run --allow-run main.ts",
     "build:script": "deno compile --allow-run --output dist/pr-parser main.ts",
     "build:app": "deno task build:script && cp dist/pr-parser ./app/PRParser.app/script",
-    "build:install": "deno task build:app && cp -R app/PRParser.app /Applications/PRParser.app"
+    "build:install": "deno task build:app && rm -rf /Applications/PRParser.app && cp -R app/PRParser.app /Applications/PRParser.app"
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@1"
