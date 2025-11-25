@@ -96,6 +96,25 @@ async function writeClipboard(content: string): Promise<void> {
 }
 
 /**
+ * Simulates Cmd+V to paste content
+ */
+async function pasteResult(): Promise<void> {
+  if (!isRunningFromApp()) {
+    return;
+  }
+
+  const script = `tell application "System Events" to keystroke "v" using command down`;
+  
+  const process = new Deno.Command("osascript", {
+    args: ["-e", script],
+    stdout: "piped",
+    stderr: "piped"
+  });
+  
+  await process.output();
+}
+
+/**
  * Parses a filename with number prefix and extracts timing information
  * Examples:
  * - "1. Feature_1_before" -> { order: 1, name: "Feature 1", timing: "before" }
@@ -417,6 +436,7 @@ async function convertClipboard(): Promise<void> {
       await showDialog(`Successfully formatted PR title!\n\nResult: ${formattedTitle}`, "Success");
       
       if (isRunningFromApp()) {
+        await pasteResult();
         Deno.exit(0);
       }
       return;
@@ -445,6 +465,7 @@ async function convertClipboard(): Promise<void> {
     
     // If running from app, we can exit cleanly
     if (isRunningFromApp()) {
+      await pasteResult();
       Deno.exit(0);
     }
     

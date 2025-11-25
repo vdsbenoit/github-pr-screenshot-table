@@ -24,7 +24,7 @@ Then use it :
   - Press `cmd` + `space`
   - Type `PRP`
   - Press enter 
-  - Paste the result
+  - The formatted title is automatically pasted
 
 **Screenshot tables**
   - Drag & drop screenshots to a PR description
@@ -32,7 +32,7 @@ Then use it :
   - Press `cmd` + `space`
   - Type `PRP`
   - Press enter
-  - Paste the result
+  - The table is automatically pasted
 
 Read [USAGE.md](USAGE.md) for more details.
 

@@ -23,6 +23,7 @@ The tool automatically detects which mode to use based on clipboard content (HTM
    - Finds and formats part suffixes (last "part N" in text)
    - Capitalizes first letter of feature name
    - Writes formatted result back to clipboard
+   - **Automatically pastes** the result (when running as an app)
 4. **Paste anywhere** - Your clipboard contains the formatted title
 
 ### Formatting Rules
